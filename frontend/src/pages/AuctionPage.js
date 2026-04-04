@@ -35,6 +35,8 @@ export default function AuctionPage() {
   const [bidError, setBidError] = useState('');
   const [chat, setChat] = useState([]);
   const [showSquad, setShowSquad] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const timerRef = useRef(null);
 
   const fetchRoom = useCallback(async () => {
@@ -46,7 +48,6 @@ export default function AuctionPage() {
       if (r.status === 'lobby') navigate(`/room/${roomId}/lobby`);
       setChat(r.chat || []);
 
-      // Restore current player
       const ap = r.players?.[r.currentPlayerIndex];
       if (ap?.player) {
         setCurrentPlayer(ap.player);
@@ -178,10 +179,15 @@ export default function AuctionPage() {
       setRoom(r => r ? { ...r, teams } : r);
     });
 
+    socket.on('room_deleted', () => {
+      navigate('/dashboard');
+    });
+
     return () => {
       ['room_joined','auction_started','next_player','timer_tick','bid_placed','bid_rejected',
        'going_once','going_twice','player_sold','player_unsold','player_skipped',
-       'auction_paused','auction_resumed','auction_completed','chat_message','user_joined'].forEach(e => socket.off(e));
+       'auction_paused','auction_resumed','auction_completed','chat_message','user_joined',
+       'room_deleted'].forEach(e => socket.off(e));
     };
   }, [socket, roomId, navigate, currentPlayer]);
 
@@ -192,6 +198,20 @@ export default function AuctionPage() {
   const handleSkip = () => socket?.emit('skip_player', { roomId });
   const handlePause = () => socket?.emit('pause_auction', { roomId });
   const handleChat = (msg) => socket?.emit('chat_message', { roomId, message: msg });
+
+  const handleDeleteRoom = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/rooms/${roomId}`);
+      socket?.emit('delete_room', { roomId });
+      navigate('/dashboard');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete room');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   const isHost = room?.hostUsername === user?.username;
   const myTeam = room?.teams?.find(t => t.username === user?.username);
@@ -219,6 +239,38 @@ export default function AuctionPage() {
         soldTo={overlayData.soldTo}
         price={overlayData.price}
       />
+
+      {/* Delete Confirm Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }}>
+          <div className="rounded-2xl p-6 max-w-sm w-full"
+            style={{ background: '#0d0d2b', border: '1px solid rgba(255,61,61,0.4)' }}>
+            <div className="text-3xl mb-3 text-center">🗑️</div>
+            <h3 className="font-display text-xl tracking-wider text-white text-center mb-2">
+              END AUCTION?
+            </h3>
+            <p className="text-gray-400 text-sm text-center mb-6">
+              This will permanently delete the room and end the auction for all players.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 h-11 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteRoom}
+                disabled={deleting}
+                className="flex-1 h-11 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: 'rgba(255,61,61,0.2)', border: '1px solid rgba(255,61,61,0.5)', color: '#ff3d3d' }}>
+                {deleting ? 'Deleting...' : '🗑️ Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top bar */}
       <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 md:px-6 py-3"
@@ -267,6 +319,11 @@ export default function AuctionPage() {
                 style={{ background: 'rgba(255,61,61,0.1)', border: '1px solid rgba(255,61,61,0.3)', color: '#ff3d3d' }}>
                 ⏭ Skip
               </button>
+              <button onClick={() => setShowDeleteConfirm(true)}
+                className="px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: 'rgba(255,61,61,0.1)', border: '1px solid rgba(255,61,61,0.3)', color: '#ff3d3d' }}>
+                🗑️ End
+              </button>
             </div>
           )}
         </div>
@@ -295,12 +352,9 @@ export default function AuctionPage() {
                   border: `1px solid ${accent}30`,
                   boxShadow: `0 0 40px ${accent}10`,
                 }}>
-                {/* Accent stripe */}
                 <div className="h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
-
                 <div className="p-6">
                   <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
-                    {/* Player avatar + info */}
                     <div className="flex items-center gap-5 flex-1">
                       <div className="relative">
                         <div className="w-24 h-24 rounded-2xl flex items-center justify-center text-5xl"
@@ -315,7 +369,6 @@ export default function AuctionPage() {
                           {currentPlayer.position}
                         </span>
                       </div>
-
                       <div>
                         <h2 className="font-display text-3xl md:text-4xl tracking-wider text-white leading-tight">
                           {currentPlayer.name}
@@ -326,7 +379,6 @@ export default function AuctionPage() {
                           <span className="text-gray-600 text-sm">OVR</span>
                           <span className="text-gray-500 text-sm">Age {currentPlayer.age}</span>
                         </div>
-                        {/* Stats row */}
                         <div className="flex gap-4 mt-2">
                           {currentPlayer.position === 'GK' ? (
                             <>
@@ -343,8 +395,6 @@ export default function AuctionPage() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Timer */}
                     <div className="flex flex-col items-center gap-2">
                       <AuctionTimer timeLeft={timeLeft} total={room.settings?.bidTimer || 15} />
                       {isPaused && (
@@ -363,7 +413,6 @@ export default function AuctionPage() {
                 </div>
               )}
 
-              {/* Bid panel */}
               <BidPanel
                 currentBid={currentBid}
                 myBudget={myTeam?.remainingBudget || 0}
@@ -374,10 +423,8 @@ export default function AuctionPage() {
                 minIncrement={room.settings?.minBidIncrement}
               />
 
-              {/* Bid History */}
               <BidHistory bids={bids} />
 
-              {/* Chat */}
               <ChatPanel messages={chat} onSend={handleChat} myUsername={user?.username} />
             </>
           ) : (
@@ -398,7 +445,6 @@ export default function AuctionPage() {
             myUsername={user?.username}
           />
 
-          {/* My squad drawer */}
           {showSquad && myTeam && (
             <div className="rounded-2xl overflow-hidden"
               style={{ background: '#0d0d2b', border: '1px solid rgba(0,255,135,0.15)' }}>
