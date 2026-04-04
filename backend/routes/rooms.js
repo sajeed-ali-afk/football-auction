@@ -113,4 +113,19 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// DELETE /api/rooms/:id - Delete room (host only)
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id);
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+    if (room.host.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Only host can delete room' });
+    }
+    await Room.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Room deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

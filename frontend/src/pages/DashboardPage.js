@@ -76,6 +76,18 @@ export default function DashboardPage() {
     else navigate(`/room/${room._id}/results`);
   };
 
+  const handleDeleteRoom = async (roomId, e) => {
+    e.stopPropagation(); // Prevent triggering the rejoin
+    if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
+    try {
+      await api.delete(`/rooms/${roomId}`);
+      setRooms(rooms => rooms.filter(r => r._id !== roomId));
+      setSuccess('Room deleted successfully');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete room');
+    }
+  };
+
   const statusColor = (s) => {
     if (s === 'lobby') return 'text-neon-blue';
     if (s === 'active') return 'text-neon-green';
@@ -116,6 +128,13 @@ export default function DashboardPage() {
               <div className="mb-4 px-4 py-3 rounded-xl text-sm animate-shake"
                 style={{ background: 'rgba(255,61,61,0.1)', border: '1px solid rgba(255,61,61,0.3)', color: '#ff3d3d' }}>
                 ⚠️ {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="mb-4 px-4 py-3 rounded-xl text-sm"
+                style={{ background: 'rgba(0,255,135,0.1)', border: '1px solid rgba(0,255,135,0.3)', color: '#00ff87' }}>
+                ✅ {success}
               </div>
             )}
 
@@ -203,7 +222,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {rooms.map(room => (
-                  <div key={room._id} className="rounded-xl p-4 flex items-center justify-between cursor-pointer group transition-all"
+                  <div key={room._id} className="rounded-xl p-4 flex items-center justify-between cursor-pointer group transition-all relative"
                     style={{ background: '#0d0d2b', border: '1px solid rgba(255,255,255,0.07)' }}
                     onClick={() => handleRejoin(room)}>
                     <div>
@@ -217,7 +236,18 @@ export default function DashboardPage() {
                         {room.hostUsername === user?.username ? '👑 Host' : '👤 Player'}
                       </p>
                     </div>
-                    <div className="text-gray-600 group-hover:text-neon-green transition-colors text-xl">→</div>
+                    <div className="flex items-center gap-2">
+                      {room.hostUsername === user?.username && (
+                        <button
+                          onClick={(e) => handleDeleteRoom(room._id, e)}
+                          className="text-red-400 hover:text-red-300 transition-colors text-lg"
+                          title="Delete Room"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                      <div className="text-gray-600 group-hover:text-neon-green transition-colors text-xl">→</div>
+                    </div>
                   </div>
                 ))}
               </div>
