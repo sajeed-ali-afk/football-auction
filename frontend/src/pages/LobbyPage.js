@@ -16,6 +16,9 @@ export default function LobbyPage() {
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(null); // 'leave' | 'delete'
 
   const fetchRoom = useCallback(async () => {
     try {
@@ -52,12 +55,16 @@ export default function LobbyPage() {
     socket.on('auction_started', () => {
       navigate(`/room/${roomId}/auction`);
     });
+    socket.on('room_deleted', () => {
+      navigate('/dashboard');
+    });
 
     return () => {
       socket.off('user_joined');
       socket.off('user_left');
       socket.off('ready_update');
       socket.off('auction_started');
+      socket.off('room_deleted');
     };
   }, [socket, room, roomId, navigate]);
 
@@ -69,25 +76,38 @@ export default function LobbyPage() {
     socket?.emit('start_auction', { roomId });
   };
 
-  const handleDeleteRoom = async () => {
-    if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
-    try {
-      await api.delete(`/rooms/${roomId}`);
-      navigate('/dashboard');
-    } catch (err) {
-      alert('Failed to delete room: ' + (err.response?.data?.error || 'Unknown error'));
-    }
-  };
-
-  const handleLeaveRoom = () => {
-    socket?.emit('leave_room', { roomId });
-    navigate('/dashboard');
-  };
-
   const copyCode = () => {
     navigator.clipboard.writeText(room.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleLeaveRoom = async () => {
+    setLeaving(true);
+    try {
+      await api.post(`/rooms/${roomId}/leave`);
+      socket?.emit('leave_room', { roomId });
+      navigate('/dashboard');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to leave room');
+    } finally {
+      setLeaving(false);
+      setShowConfirm(null);
+    }
+  };
+
+  const handleDeleteRoom = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/rooms/${roomId}`);
+      socket?.emit('delete_room', { roomId });
+      navigate('/dashboard');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete room');
+    } finally {
+      setDeleting(false);
+      setShowConfirm(null);
+    }
   };
 
   if (loading) {
@@ -102,11 +122,49 @@ export default function LobbyPage() {
 
   const isHost = room.host?._id === user?._id || room.host === user?._id || room.hostUsername === user?.username;
   const myTeam = room.teams?.find(t => t.user === user?._id || t.username === user?.username);
-  const allReady = room.teams?.length >= 2 && room.teams?.every(t => t.isReady || t.username === room.hostUsername);
 
   return (
     <div className="min-h-screen">
       <Navbar />
+
+      {/* Confirm Modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="rounded-2xl p-6 max-w-sm w-full"
+            style={{ background: '#0d0d2b', border: `1px solid ${showConfirm === 'delete' ? 'rgba(255,61,61,0.4)' : 'rgba(255,215,0,0.4)'}` }}>
+            <div className="text-3xl mb-3 text-center">{showConfirm === 'delete' ? '🗑️' : '🚪'}</div>
+            <h3 className="font-display text-xl tracking-wider text-white text-center mb-2">
+              {showConfirm === 'delete' ? 'DELETE ROOM?' : 'LEAVE ROOM?'}
+            </h3>
+            <p className="text-gray-400 text-sm text-center mb-6">
+              {showConfirm === 'delete'
+                ? 'This will permanently delete the room and kick all players.'
+                : 'You will leave this room and lose your spot.'}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(null)}
+                className="flex-1 h-11 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+                Cancel
+              </button>
+              <button
+                onClick={showConfirm === 'delete' ? handleDeleteRoom : handleLeaveRoom}
+                disabled={deleting || leaving}
+                className="flex-1 h-11 rounded-xl text-sm font-semibold transition-all"
+                style={{
+                  background: showConfirm === 'delete' ? 'rgba(255,61,61,0.2)' : 'rgba(255,215,0,0.15)',
+                  border: `1px solid ${showConfirm === 'delete' ? 'rgba(255,61,61,0.5)' : 'rgba(255,215,0,0.4)'}`,
+                  color: showConfirm === 'delete' ? '#ff3d3d' : '#ffd700',
+                }}>
+                {deleting || leaving ? 'Please wait...' : showConfirm === 'delete' ? '🗑️ Delete' : '🚪 Leave'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="pt-24 pb-16 px-4 max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8 animate-fade-in">
@@ -208,23 +266,19 @@ export default function LobbyPage() {
 
             {/* Controls */}
             <div className="space-y-3">
+              {/* Ready button for non-host */}
               {!isHost && (
-                <>
-                  <button onClick={handleReady}
-                    className={`w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all ${
-                      myTeam?.isReady
-                        ? 'bg-neon-green/10 border border-neon-green/30 text-neon-green'
-                        : 'btn-solid'
-                    }`}>
-                    {myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
-                  </button>
-                  <button onClick={handleLeaveRoom}
-                    className="w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all bg-gray-600 hover:bg-gray-700 text-white border border-gray-500">
-                    🚪 LEAVE ROOM
-                  </button>
-                </>
+                <button onClick={handleReady}
+                  className={`w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all ${
+                    myTeam?.isReady
+                      ? 'bg-neon-green/10 border border-neon-green/30 text-neon-green'
+                      : 'btn-solid'
+                  }`}>
+                  {myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
+                </button>
               )}
 
+              {/* Start button for host */}
               {isHost && (
                 <button
                   onClick={handleStart}
@@ -236,10 +290,30 @@ export default function LobbyPage() {
                 </button>
               )}
 
+              {/* Leave Room button for non-host */}
+              {!isHost && (
+                <button
+                  onClick={() => setShowConfirm('leave')}
+                  className="w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all"
+                  style={{
+                    background: 'rgba(255,215,0,0.08)',
+                    border: '1px solid rgba(255,215,0,0.3)',
+                    color: '#ffd700',
+                  }}>
+                  🚪 LEAVE ROOM
+                </button>
+              )}
+
+              {/* Delete Room button for host */}
               {isHost && (
                 <button
-                  onClick={handleDeleteRoom}
-                  className="w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all bg-red-600 hover:bg-red-700 text-white border border-red-500">
+                  onClick={() => setShowConfirm('delete')}
+                  className="w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all"
+                  style={{
+                    background: 'rgba(255,61,61,0.08)',
+                    border: '1px solid rgba(255,61,61,0.3)',
+                    color: '#ff3d3d',
+                  }}>
                   🗑️ DELETE ROOM
                 </button>
               )}
