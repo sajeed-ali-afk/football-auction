@@ -82,7 +82,6 @@ router.post('/join', auth, async (req, res) => {
       isReady: true,
     });
       isReady: false,
-    });
     await room.save();
     const populated = await Room.findById(room._id).populate('players.player');
     res.json({ room: populated });
