@@ -20,6 +20,8 @@ export default function LobbyPage() {
   const [deleting, setDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(null); // 'leave' | 'delete'
 
+  const [readyLoading, setReadyLoading] = useState(false);
+
   const fetchRoom = useCallback(async () => {
     try {
       const res = await api.get(`/rooms/${roomId}`);
@@ -51,6 +53,11 @@ export default function LobbyPage() {
     });
     socket.on('ready_update', ({ teams }) => {
       setRoom(r => r ? { ...r, teams } : r);
+      setReadyLoading(false);
+    });
+    socket.on('error', ({ message }) => {
+      setReadyLoading(false);
+      alert('Error: ' + message);
     });
     socket.on('auction_started', () => {
       navigate(`/room/${roomId}/auction`);
@@ -65,21 +72,13 @@ export default function LobbyPage() {
       socket.off('ready_update');
       socket.off('auction_started');
       socket.off('room_deleted');
+      socket.off('error');
     };
   }, [socket, room, roomId, navigate]);
 
   const handleReady = () => {
-    // Optimistically update local state
-    setRoom(r => {
-      if (!r) return r;
-      const newTeams = r.teams.map(t => 
-        t.user === user?._id || t.username === user?.username 
-          ? { ...t, isReady: !t.isReady } 
-          : t
-      );
-      return { ...r, teams: newTeams };
-    });
-    // Then emit to server
+    if (readyLoading) return;
+    setReadyLoading(true);
     socket?.emit('player_ready', { roomId });
   };
 
@@ -280,12 +279,13 @@ export default function LobbyPage() {
               {/* Ready button for non-host */}
               {!isHost && (
                 <button onClick={handleReady}
+                  disabled={readyLoading}
                   className={`w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all ${
                     myTeam?.isReady
                       ? 'bg-neon-green/10 border border-neon-green/30 text-neon-green'
                       : 'btn-solid'
-                  }`}>
-                  {myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
+                  } ${readyLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {readyLoading ? '⏳ UPDATING...' : myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
                 </button>
               )}
 
