@@ -43,6 +43,8 @@ router.post('/', auth, async (req, res) => {
         budget: settings?.budgetPerTeam || 100,
         remainingBudget: settings?.budgetPerTeam || 100,
         squad: [],
+        isReady: true,
+      }],
         isReady: false,
       }],
     });
@@ -78,6 +80,8 @@ router.post('/join', auth, async (req, res) => {
       budget: room.settings.budgetPerTeam,
       remainingBudget: room.settings.budgetPerTeam,
       squad: [],
+      isReady: true,
+    });
       isReady: false,
     });
     await room.save();
