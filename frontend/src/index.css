@@ -1,0 +1,174 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon-green: #00ff87;
+  --neon-blue: #00d4ff;
+  --neon-yellow: #ffd700;
+  --neon-red: #ff3d3d;
+  --dark-bg: #060612;
+  --dark-card: #0d0d2b;
+  --dark-border: #1a1a4e;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: #e2e8f0;
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a1a;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--neon-green);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00cc6e;
+}
+
+/* Selection */
+::selection {
+  background: rgba(0, 255, 135, 0.2);
+  color: var(--neon-green);
+}
+
+/* Glass card */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+}
+
+/* Neon button */
+.btn-neon {
+  @apply relative overflow-hidden px-6 py-3 font-body font-semibold tracking-wider transition-all duration-300;
+  background: transparent;
+  border: 1px solid var(--neon-green);
+  color: var(--neon-green);
+  text-shadow: 0 0 8px var(--neon-green);
+  box-shadow: 0 0 10px rgba(0, 255, 135, 0.2), inset 0 0 10px rgba(0, 255, 135, 0.05);
+}
+.btn-neon:hover {
+  background: rgba(0, 255, 135, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 135, 0.4), inset 0 0 20px rgba(0, 255, 135, 0.1);
+  transform: translateY(-1px);
+}
+.btn-neon:active { transform: translateY(0); }
+
+/* Solid neon */
+.btn-solid {
+  @apply relative overflow-hidden px-6 py-3 font-body font-bold tracking-wider transition-all duration-300;
+  background: var(--neon-green);
+  color: #060612;
+  box-shadow: 0 0 20px rgba(0, 255, 135, 0.4);
+}
+.btn-solid:hover {
+  box-shadow: 0 0 30px rgba(0, 255, 135, 0.6), 0 0 60px rgba(0, 255, 135, 0.2);
+  transform: translateY(-2px);
+}
+.btn-solid:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Player card */
+.player-card {
+  background: linear-gradient(135deg, #0d0d2b 0%, #111133 100%);
+  border: 1px solid var(--glass-border);
+  transition: all 0.3s ease;
+}
+.player-card:hover {
+  border-color: rgba(0, 255, 135, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 255, 135, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Position badges */
+.pos-gk { background: rgba(255, 215, 0, 0.15); color: #ffd700; border: 1px solid rgba(255, 215, 0, 0.3); }
+.pos-def { background: rgba(0, 212, 255, 0.15); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.3); }
+.pos-mid { background: rgba(0, 255, 135, 0.15); color: #00ff87; border: 1px solid rgba(0, 255, 135, 0.3); }
+.pos-fwd { background: rgba(255, 61, 61, 0.15); color: #ff3d3d; border: 1px solid rgba(255, 61, 61, 0.3); }
+
+/* Input styles */
+.input-dark {
+  @apply w-full px-4 py-3 rounded-lg font-body transition-all duration-200;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+.input-dark:focus {
+  outline: none;
+  border-color: var(--neon-green);
+  box-shadow: 0 0 0 2px rgba(0, 255, 135, 0.1);
+}
+.input-dark::placeholder { color: rgba(255, 255, 255, 0.3); }
+
+/* Timer ring */
+.timer-ring circle {
+  transition: stroke-dashoffset 1s linear;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+/* Going once/twice/sold animations */
+.auction-status {
+  @apply font-display text-4xl tracking-widest text-center;
+  animation: soldBounce 0.6s ease-out forwards;
+}
+
+/* Bid history item */
+.bid-item:first-child {
+  animation: bidFlash 0.5s ease-out;
+}
+
+/* Chat bubble */
+.chat-bubble {
+  @apply px-3 py-2 rounded-lg text-sm;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* Star rating display */
+.rating-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.rating-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--neon-green), var(--neon-blue));
+  transition: width 0.5s ease;
+}
+
+@keyframes soldBounce {
+  0% { transform: scale(0.5) rotateX(30deg); opacity: 0; }
+  60% { transform: scale(1.05) rotateX(-5deg); opacity: 1; }
+  100% { transform: scale(1) rotateX(0deg); opacity: 1; }
+}
+
+@keyframes bidFlash {
+  0% { background-color: rgba(0, 255, 135, 0.25); }
+  100% { background-color: transparent; }
+}

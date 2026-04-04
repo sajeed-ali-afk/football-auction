@@ -1,0 +1,13 @@
+{
+  "name": "football-auction",
+  "version": "1.0.0",
+  "description": "Football Auction Game - Full Stack",
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "seed": "cd backend && npm run seed",
+    "build": "cd frontend && npm run build"
+  },
+  "private": true
+}
