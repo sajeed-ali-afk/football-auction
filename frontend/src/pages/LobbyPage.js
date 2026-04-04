@@ -69,6 +69,21 @@ export default function LobbyPage() {
     socket?.emit('start_auction', { roomId });
   };
 
+  const handleDeleteRoom = async () => {
+    if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
+    try {
+      await api.delete(`/rooms/${roomId}`);
+      navigate('/dashboard');
+    } catch (err) {
+      alert('Failed to delete room: ' + (err.response?.data?.error || 'Unknown error'));
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    socket?.emit('leave_room', { roomId });
+    navigate('/dashboard');
+  };
+
   const copyCode = () => {
     navigator.clipboard.writeText(room.code);
     setCopied(true);
@@ -194,14 +209,20 @@ export default function LobbyPage() {
             {/* Controls */}
             <div className="space-y-3">
               {!isHost && (
-                <button onClick={handleReady}
-                  className={`w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all ${
-                    myTeam?.isReady
-                      ? 'bg-neon-green/10 border border-neon-green/30 text-neon-green'
-                      : 'btn-solid'
-                  }`}>
-                  {myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
-                </button>
+                <>
+                  <button onClick={handleReady}
+                    className={`w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all ${
+                      myTeam?.isReady
+                        ? 'bg-neon-green/10 border border-neon-green/30 text-neon-green'
+                        : 'btn-solid'
+                    }`}>
+                    {myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
+                  </button>
+                  <button onClick={handleLeaveRoom}
+                    className="w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all bg-gray-600 hover:bg-gray-700 text-white border border-gray-500">
+                    🚪 LEAVE ROOM
+                  </button>
+                </>
               )}
 
               {isHost && (
@@ -212,6 +233,14 @@ export default function LobbyPage() {
                   {room.teams?.length < 2
                     ? '⏳ Need at least 2 teams'
                     : '🚀 START AUCTION'}
+                </button>
+              )}
+
+              {isHost && (
+                <button
+                  onClick={handleDeleteRoom}
+                  className="w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all bg-red-600 hover:bg-red-700 text-white border border-red-500">
+                  🗑️ DELETE ROOM
                 </button>
               )}
 

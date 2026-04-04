@@ -240,7 +240,7 @@ export default function DashboardPage() {
                       {room.hostUsername === user?.username && (
                         <button
                           onClick={(e) => handleDeleteRoom(room._id, e)}
-                          className="text-red-400 hover:text-red-300 transition-colors text-lg"
+                          className="px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm transition-colors"
                           title="Delete Room"
                         >
                           🗑️

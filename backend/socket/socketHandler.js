@@ -193,6 +193,26 @@ const initializeSocket = (io) => {
       }
     });
 
+    // Leave room
+    socket.on('leave_room', async ({ roomId }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return socket.emit('error', { message: 'Room not found' });
+
+        // Remove user from teams
+        room.teams = room.teams.filter(t => t.user.toString() !== socket.user._id.toString());
+        await room.save();
+
+        socket.leave(roomId);
+        socket.currentRoomId = null;
+
+        // Notify others
+        io.to(roomId).emit('user_left', { username: socket.user.username });
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
     // Ready up
     socket.on('player_ready', async ({ roomId }) => {
       try {
