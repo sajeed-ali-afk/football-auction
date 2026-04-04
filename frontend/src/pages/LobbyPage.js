@@ -77,9 +77,14 @@ export default function LobbyPage() {
   }, [socket, room, roomId, navigate]);
 
   const handleReady = () => {
-    if (readyLoading) return;
+    if (readyLoading || !socket?.connected) return;
     setReadyLoading(true);
     socket?.emit('player_ready', { roomId });
+    
+    // Timeout to reset loading state if no response
+    setTimeout(() => {
+      setReadyLoading(false);
+    }, 5000); // 5 second timeout
   };
 
   const handleStart = () => {
@@ -279,13 +284,13 @@ export default function LobbyPage() {
               {/* Ready button for non-host */}
               {!isHost && (
                 <button onClick={handleReady}
-                  disabled={readyLoading}
+                  disabled={readyLoading || !socket?.connected}
                   className={`w-full h-12 rounded-xl font-semibold text-sm tracking-widest transition-all ${
                     myTeam?.isReady
                       ? 'bg-neon-green/10 border border-neon-green/30 text-neon-green'
                       : 'btn-solid'
-                  } ${readyLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  {readyLoading ? '⏳ UPDATING...' : myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
+                  } ${readyLoading || !socket?.connected ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {readyLoading ? '⏳ UPDATING...' : !socket?.connected ? '🔌 RECONNECTING...' : myTeam?.isReady ? '✓ READY — Click to Unready' : '✅ MARK AS READY'}
                 </button>
               )}
 

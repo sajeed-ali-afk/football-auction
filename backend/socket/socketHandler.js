@@ -197,13 +197,18 @@ const initializeSocket = (io) => {
     socket.on('player_ready', async ({ roomId }) => {
       try {
         const room = await Room.findById(roomId);
-        if (!room) return;
-        const team = room.teams.find(t => t.user.toString() === socket.user._id.toString());
-        if (team) {
-          team.isReady = !team.isReady;
-          await room.save();
-          io.to(roomId).emit('ready_update', { teams: room.teams });
+        if (!room) {
+          socket.emit('error', { message: 'Room not found' });
+          return;
         }
+        const team = room.teams.find(t => t.user.toString() === socket.user._id.toString());
+        if (!team) {
+          socket.emit('error', { message: 'Team not found' });
+          return;
+        }
+        team.isReady = !team.isReady;
+        await room.save();
+        io.to(roomId).emit('ready_update', { teams: room.teams });
       } catch (err) {
         socket.emit('error', { message: err.message });
       }
