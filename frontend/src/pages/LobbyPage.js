@@ -69,6 +69,17 @@ export default function LobbyPage() {
   }, [socket, room, roomId, navigate]);
 
   const handleReady = () => {
+    // Optimistically update local state
+    setRoom(r => {
+      if (!r) return r;
+      const newTeams = r.teams.map(t => 
+        t.user === user?._id || t.username === user?.username 
+          ? { ...t, isReady: !t.isReady } 
+          : t
+      );
+      return { ...r, teams: newTeams };
+    });
+    // Then emit to server
     socket?.emit('player_ready', { roomId });
   };
 
