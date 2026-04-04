@@ -89,11 +89,6 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
-
-        {/* Demo hint */}
-        <div className="mt-4 text-center">
-          <p className="text-xs text-gray-600">Run <code className="text-neon-green">npm run seed</code> in backend to load players</p>
-        </div>
       </div>
     </div>
   );
