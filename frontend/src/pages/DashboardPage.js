@@ -76,17 +76,7 @@ export default function DashboardPage() {
     else navigate(`/room/${room._id}/results`);
   };
 
-  const handleDeleteRoom = async (roomId, e) => {
-    e.stopPropagation(); // Prevent triggering the rejoin
-    if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
-    try {
-      await api.delete(`/rooms/${roomId}`);
-      setRooms(rooms => rooms.filter(r => r._id !== roomId));
-      setSuccess('Room deleted successfully');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to delete room');
-    }
-  };
+ 
 
   const statusColor = (s) => {
     if (s === 'lobby') return 'text-neon-blue';
