@@ -121,17 +121,10 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {success && (
-              <div className="mb-4 px-4 py-3 rounded-xl text-sm"
-                style={{ background: 'rgba(0,255,135,0.1)', border: '1px solid rgba(0,255,135,0.3)', color: '#00ff87' }}>
-                ✅ {success}
-              </div>
-            )}
-
             {tab === 'create' ? (
               <form onSubmit={handleCreate} className="rounded-2xl p-6 space-y-5"
                 style={{ background: '#0d0d2b', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div>
+                  <div>
                   <label className="block text-xs text-gray-500 mb-2 tracking-wider uppercase">Room Name</label>
                   <input
                     type="text" className="input-dark"
@@ -212,7 +205,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {rooms.map(room => (
-                  <div key={room._id} className="rounded-xl p-4 flex items-center justify-between cursor-pointer group transition-all relative"
+                  <div key={room._id} className="rounded-xl p-4 flex items-center justify-between cursor-pointer group transition-all"
                     style={{ background: '#0d0d2b', border: '1px solid rgba(255,255,255,0.07)' }}
                     onClick={() => handleRejoin(room)}>
                     <div>
@@ -226,18 +219,7 @@ export default function DashboardPage() {
                         {room.hostUsername === user?.username ? '👑 Host' : '👤 Player'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {room.hostUsername === user?.username && (
-                        <button
-                          onClick={(e) => handleDeleteRoom(room._id, e)}
-                          className="text-red-400 hover:text-red-300 transition-colors text-lg"
-                          title="Delete Room"
-                        >
-                          🗑️
-                        </button>
-                      )}
-                      <div className="text-gray-600 group-hover:text-neon-green transition-colors text-xl">→</div>
-                    </div>
+                    <div className="text-gray-600 group-hover:text-neon-green transition-colors text-xl">→</div>
                   </div>
                 ))}
               </div>
