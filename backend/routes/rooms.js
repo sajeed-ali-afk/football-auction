@@ -46,7 +46,6 @@ router.post('/', auth, async (req, res) => {
         isReady: true,
       }],
         isReady: false,
-      }],
     });
 
     await room.save();
