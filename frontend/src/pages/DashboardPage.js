@@ -109,7 +109,7 @@ export default function DashboardPage() {
                   style={tab === t
                     ? { background: '#00ff87', color: '#060612' }
                     : { color: '#6b7280' }}>
-                  {t === 'create' ? '🏗️ Create Room' : '🔗 Join Room'}
+                  {t === 'create' ? 'Create Room' : 'Join Room'}
                 </button>
               ))}
             </div>
@@ -187,7 +187,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-600 text-center mt-2">Get the code from your auction host</p>
                 </div>
                 <button type="submit" disabled={loading} className="btn-solid w-full rounded-xl h-12 text-sm tracking-widest">
-                  {loading ? 'JOINING...' : '🚀 JOIN ROOM'}
+                  {loading ? 'JOINING...' : 'JOIN ROOM'}
                 </button>
               </form>
             )}

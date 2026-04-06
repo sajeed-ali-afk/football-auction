@@ -37,7 +37,7 @@ export default function Navbar() {
           {!isAuction && (
             <button onClick={() => navigate('/dashboard')}
               className="hidden md:flex items-center gap-2 text-gray-400 hover:text-neon-green transition-colors text-sm font-medium">
-              <span>🏠</span> Dashboard
+              Dashboard
             </button>
           )}
           <div className="relative">
