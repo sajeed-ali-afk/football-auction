@@ -4,6 +4,7 @@ const User = require('../models/User');
 
 const auctionTimers = new Map();
 const auctionState = new Map();
+const skipVotes = new Map(); // roomId -> Set of userIds who voted to skip
 
 const verifyToken = (token) => {
   try {
@@ -26,7 +27,6 @@ const getCurrentState = (roomId) => {
 
 const startBidTimer = async (io, roomId, timerDuration) => {
   clearAuctionTimer(roomId);
-
   const state = auctionState.get(roomId) || {};
   state.timeLeft = timerDuration;
   auctionState.set(roomId, state);
@@ -34,14 +34,9 @@ const startBidTimer = async (io, roomId, timerDuration) => {
   const interval = setInterval(async () => {
     const s = auctionState.get(roomId);
     if (!s) { clearInterval(interval); return; }
-
     s.timeLeft -= 1;
     auctionState.set(roomId, s);
-
     io.to(roomId).emit('timer_tick', { timeLeft: s.timeLeft });
-
-    // ✅ Removed going_once and going_twice countdown overlays
-
     if (s.timeLeft <= 0) {
       clearInterval(interval);
       auctionTimers.delete(roomId);
@@ -64,6 +59,8 @@ const finalizeCurrentPlayer = async (io, roomId) => {
     const state = auctionState.get(roomId);
     const hasBid = state?.currentBidder && state?.currentBid > 0;
 
+    skipVotes.set(roomId, new Set());
+
     if (hasBid) {
       currentAuctionPlayer.status = 'sold';
       currentAuctionPlayer.soldTo = state.currentBidder;
@@ -73,10 +70,7 @@ const finalizeCurrentPlayer = async (io, roomId) => {
       const team = room.teams.find(t => t.user.toString() === state.currentBidder.toString());
       if (team) {
         team.remainingBudget = Math.round((team.remainingBudget - state.currentBid) * 10) / 10;
-        team.squad.push({
-          player: currentAuctionPlayer.player._id,
-          pricePaid: state.currentBid,
-        });
+        team.squad.push({ player: currentAuctionPlayer.player._id, pricePaid: state.currentBid });
       }
 
       io.to(roomId).emit('player_sold', {
@@ -87,9 +81,7 @@ const finalizeCurrentPlayer = async (io, roomId) => {
       });
     } else {
       currentAuctionPlayer.status = 'unsold';
-      io.to(roomId).emit('player_unsold', {
-        player: currentAuctionPlayer.player,
-      });
+      io.to(roomId).emit('player_unsold', { player: currentAuctionPlayer.player });
     }
 
     await room.save();
@@ -114,6 +106,7 @@ const advanceToNextPlayer = async (io, roomId) => {
       room.completedAt = new Date();
       await room.save();
       auctionState.delete(roomId);
+      skipVotes.delete(roomId);
       io.to(roomId).emit('auction_completed', { teams: room.teams });
       return;
     }
@@ -121,6 +114,8 @@ const advanceToNextPlayer = async (io, roomId) => {
     room.currentPlayerIndex = nextIdx;
     room.players[nextIdx].status = 'active';
     await room.save();
+
+    skipVotes.set(roomId, new Set());
 
     const currentPlayer = room.players[nextIdx].player;
     const newState = {
@@ -137,6 +132,8 @@ const advanceToNextPlayer = async (io, roomId) => {
       totalPlayers: room.players.length,
       basePrice: currentPlayer.basePrice,
       timeLeft: room.settings.bidTimer,
+      skipVotes: 0,
+      totalTeams: room.teams.length,
     });
 
     startBidTimer(io, roomId, room.settings.bidTimer);
@@ -164,17 +161,17 @@ const initializeSocket = (io) => {
       try {
         const room = await Room.findById(roomId).populate('players.player');
         if (!room) return socket.emit('error', { message: 'Room not found' });
-
         socket.join(roomId);
         socket.currentRoomId = roomId;
-
         const state = getCurrentState(roomId);
-        socket.emit('room_joined', { room, auctionState: state });
-
-        io.to(roomId).emit('user_joined', {
-          username: socket.user.username,
-          teams: room.teams,
+        const votes = skipVotes.get(roomId) || new Set();
+        socket.emit('room_joined', {
+          room,
+          auctionState: state,
+          skipVotes: votes.size,
+          totalTeams: room.teams.length,
         });
+        io.to(roomId).emit('user_joined', { username: socket.user.username, teams: room.teams });
       } catch (err) {
         socket.emit('error', { message: err.message });
       }
@@ -199,16 +196,16 @@ const initializeSocket = (io) => {
       try {
         const room = await Room.findById(roomId).populate('players.player');
         if (!room) return;
-        if (room.host.toString() !== socket.user._id.toString()) {
+        if (room.host.toString() !== socket.user._id.toString())
           return socket.emit('error', { message: 'Only the host can start the auction' });
-        }
-        if (room.teams.length < 2) {
+        if (room.teams.length < 2)
           return socket.emit('error', { message: 'Need at least 2 teams to start' });
-        }
 
         room.status = 'active';
         room.players[0].status = 'active';
         await room.save();
+
+        skipVotes.set(roomId, new Set());
 
         const firstPlayer = room.players[0].player;
         const initialState = {
@@ -225,6 +222,8 @@ const initializeSocket = (io) => {
           totalPlayers: room.players.length,
           basePrice: firstPlayer.basePrice,
           timeLeft: room.settings.bidTimer,
+          skipVotes: 0,
+          totalTeams: room.teams.length,
         });
 
         startBidTimer(io, roomId, room.settings.bidTimer);
@@ -245,15 +244,12 @@ const initializeSocket = (io) => {
         if (!team) return socket.emit('error', { message: 'You are not in this room' });
 
         const minBid = state.currentBid + (state.currentBidder ? room.settings.minBidIncrement : 0);
-        if (amount < minBid) {
+        if (amount < minBid)
           return socket.emit('bid_rejected', { message: `Minimum bid is £${minBid}M` });
-        }
-        if (amount > team.remainingBudget) {
+        if (amount > team.remainingBudget)
           return socket.emit('bid_rejected', { message: 'Insufficient budget' });
-        }
-        if (state.currentBidder?.toString() === socket.user._id.toString()) {
+        if (state.currentBidder?.toString() === socket.user._id.toString())
           return socket.emit('bid_rejected', { message: 'You are already the highest bidder' });
-        }
 
         const currentPlayer = room.players[room.currentPlayerIndex].player;
         const positionCount = team.squad.filter(sq => {
@@ -262,30 +258,23 @@ const initializeSocket = (io) => {
         }).length;
 
         const maxByPosition = { GK: 1, DEF: 5, MID: 5, FWD: 3 };
-        if (positionCount >= maxByPosition[currentPlayer.position]) {
-          return socket.emit('bid_rejected', {
-            message: `Squad limit reached for ${currentPlayer.position}`,
-          });
-        }
-        if (team.squad.length >= room.settings.squadSize) {
+        if (positionCount >= maxByPosition[currentPlayer.position])
+          return socket.emit('bid_rejected', { message: `Squad limit reached for ${currentPlayer.position}` });
+        if (team.squad.length >= room.settings.squadSize)
           return socket.emit('bid_rejected', { message: 'Squad is full' });
-        }
 
-        // ✅ Fully reset timer to full duration on every new bid
+        // Reset skip votes when bid placed
+        skipVotes.set(roomId, new Set());
+
         state.currentBid = amount;
         state.currentBidder = socket.user._id;
         state.currentBidderUsername = socket.user.username;
         auctionState.set(roomId, state);
 
-        // Restart timer from full duration
         startBidTimer(io, roomId, room.settings.bidTimer);
 
         const currentAP = room.players[room.currentPlayerIndex];
-        currentAP.bids.push({
-          user: socket.user._id,
-          username: socket.user.username,
-          amount,
-        });
+        currentAP.bids.push({ user: socket.user._id, username: socket.user.username, amount });
         await room.save();
 
         io.to(roomId).emit('bid_placed', {
@@ -293,23 +282,65 @@ const initializeSocket = (io) => {
           bidder: socket.user.username,
           bidderId: socket.user._id,
           timeLeft: room.settings.bidTimer,
+          skipVotes: 0,
+          totalTeams: room.teams.length,
         });
       } catch (err) {
         socket.emit('error', { message: err.message });
       }
     });
 
+    // ✅ Vote to skip - any player, skip triggers when ALL vote
+    socket.on('vote_skip', async ({ roomId }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room || room.status !== 'active') return;
+
+        const isInRoom = room.teams.some(t => t.user.toString() === socket.user._id.toString());
+        if (!isInRoom) return;
+
+        if (!skipVotes.has(roomId)) skipVotes.set(roomId, new Set());
+        const votes = skipVotes.get(roomId);
+
+        if (votes.has(socket.user._id.toString())) {
+          votes.delete(socket.user._id.toString());
+        } else {
+          votes.add(socket.user._id.toString());
+        }
+
+        const totalTeams = room.teams.length;
+        const voteCount = votes.size;
+
+        io.to(roomId).emit('skip_vote_update', {
+          skipVotes: voteCount,
+          totalTeams,
+          voters: Array.from(votes),
+        });
+
+        if (voteCount >= totalTeams) {
+          skipVotes.set(roomId, new Set());
+          clearAuctionTimer(roomId);
+          const currentAP = room.players[room.currentPlayerIndex];
+          if (currentAP) currentAP.status = 'unsold';
+          await room.save();
+          io.to(roomId).emit('player_skipped', {});
+          setTimeout(() => advanceToNextPlayer(io, roomId), 1500);
+        }
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // Host instant skip
     socket.on('skip_player', async ({ roomId }) => {
       try {
         const room = await Room.findById(roomId);
-        if (!room) return;
-        if (room.host.toString() !== socket.user._id.toString()) return;
-
+        if (!room || room.host.toString() !== socket.user._id.toString()) return;
         clearAuctionTimer(roomId);
+        skipVotes.set(roomId, new Set());
         const currentAP = room.players[room.currentPlayerIndex];
         if (currentAP) currentAP.status = 'unsold';
         await room.save();
-
         io.to(roomId).emit('player_skipped', {});
         setTimeout(() => advanceToNextPlayer(io, roomId), 1500);
       } catch (err) {
@@ -321,7 +352,6 @@ const initializeSocket = (io) => {
       try {
         const room = await Room.findById(roomId);
         if (!room || room.host.toString() !== socket.user._id.toString()) return;
-
         if (room.status === 'active') {
           clearAuctionTimer(roomId);
           room.status = 'paused';
@@ -344,7 +374,6 @@ const initializeSocket = (io) => {
         if (!message?.trim() || message.length > 200) return;
         const room = await Room.findById(roomId);
         if (!room) return;
-
         const chatMsg = {
           user: socket.user._id,
           username: socket.user.username,
@@ -354,7 +383,6 @@ const initializeSocket = (io) => {
         room.chat.push(chatMsg);
         if (room.chat.length > 100) room.chat = room.chat.slice(-100);
         await room.save();
-
         io.to(roomId).emit('chat_message', chatMsg);
       } catch (err) {
         socket.emit('error', { message: err.message });
@@ -365,6 +393,7 @@ const initializeSocket = (io) => {
       try {
         clearAuctionTimer(roomId);
         auctionState.delete(roomId);
+        skipVotes.delete(roomId);
         io.to(roomId).emit('room_deleted', {});
       } catch (err) {
         console.error('delete_room error:', err);
@@ -378,9 +407,8 @@ const initializeSocket = (io) => {
 
     socket.on('disconnect', () => {
       console.log(`🔌 Socket disconnected: ${socket.user.username}`);
-      if (socket.currentRoomId) {
+      if (socket.currentRoomId)
         io.to(socket.currentRoomId).emit('user_left', { username: socket.user.username });
-      }
     });
   });
 };
