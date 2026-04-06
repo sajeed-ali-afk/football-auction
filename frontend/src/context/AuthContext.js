@@ -9,11 +9,20 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    const savedToken = localStorage.getItem('fa_token');
+    if (savedToken) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
       api.get('/auth/me')
-        .then(res => setUser(res.data.user))
-        .catch(() => logout())
+        .then(res => {
+          setUser(res.data.user);
+          setToken(savedToken);
+        })
+        .catch(() => {
+          localStorage.removeItem('fa_token');
+          setToken(null);
+          setUser(null);
+          delete api.defaults.headers.common['Authorization'];
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
