@@ -92,7 +92,7 @@ router.post('/join', auth, async (req, res) => {
 
 // GET /api/rooms/:id - Get room
 router.get('/:id', auth, async (req, res) => {
-  try {
+  try { 
     const room = await Room.findById(req.params.id)
       .populate('players.player')
       .populate('host', 'username');
